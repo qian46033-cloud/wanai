@@ -1,0 +1,6 @@
+{
+  "name": "犬系痕 · 您想我了",
+  "description": "光遇高级三恋陪伴与个人档案，现代黑白极简主义风格名片，整合风格展示、台词话术、板评陪评与实时预约档期。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
