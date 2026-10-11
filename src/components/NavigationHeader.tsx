@@ -1,5 +1,6 @@
 import React from 'react';
 import { Sun, Moon } from 'lucide-react';
+import { MusicPlayer } from './MusicPlayer';
 
 interface NavigationHeaderProps {
   currentStep: string;
@@ -88,6 +89,9 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
           >
             {isDarkMode ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
           </button>
+
+          {/* Music Player Button */}
+          <MusicPlayer src="/broken_heart.mp3" songTitle="broken heart" artist="FinalSay" />
         </div>
       </div>
     </header>
