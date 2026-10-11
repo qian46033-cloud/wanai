@@ -91,7 +91,7 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
           </button>
 
           {/* Music Player Button */}
-          <MusicPlayer src="/broken_heart.mp3" songTitle="broken heart" artist="FinalSay" />
+          <MusicPlayer />
         </div>
       </div>
     </header>

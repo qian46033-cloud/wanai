@@ -1,57 +1,94 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Volume2, VolumeX, Music } from 'lucide-react';
+import { Volume2, VolumeX, Music, Disc, Check, Copy } from 'lucide-react';
 
-interface MusicPlayerProps {
-  src?: string;
-  songTitle?: string;
-  artist?: string;
+export interface TrackInfo {
+  id: 'v1' | 'v2';
+  title: string;
+  artist: string;
+  src: string;
+  label: string;
+  queryParam: string;
 }
 
-export const MusicPlayer: React.FC<MusicPlayerProps> = ({
-  src = '/broken_heart.mp3',
-  songTitle = 'broken heart',
-  artist = 'FinalSay',
-}) => {
+export const TRACKS: TrackInfo[] = [
+  {
+    id: 'v1',
+    title: 'broken heart',
+    artist: 'FinalSay',
+    src: '/broken_heart.mp3',
+    label: '版本一',
+    queryParam: '1',
+  },
+  {
+    id: 'v2',
+    title: 'Honest',
+    artist: 'rei brown',
+    src: '/honest.mp3',
+    label: '版本二',
+    queryParam: '2',
+  },
+];
+
+const detectInitialTrack = (): TrackInfo => {
+  if (typeof window === 'undefined') return TRACKS[0];
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const hash = window.location.hash.toLowerCase();
+    const v = params.get('v') || params.get('version') || params.get('music') || params.get('bgm');
+    
+    if (v === '2' || v === 'honest' || v === 'v2' || hash === '#v2' || hash === '#honest') {
+      return TRACKS[1];
+    }
+  } catch {
+    // fallback
+  }
+  return TRACKS[0];
+};
+
+export const MusicPlayer: React.FC = () => {
+  const [currentTrack, setCurrentTrack] = useState<TrackInfo>(detectInitialTrack);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [hasUserToggled, setHasUserToggled] = useState<boolean>(false);
-  const [isAudioLoaded, setIsAudioLoaded] = useState<boolean>(false);
   const [showToast, setShowToast] = useState<boolean>(false);
+  const [toastMessage, setToastMessage] = useState<string>('');
+  const [copiedLink, setCopiedLink] = useState<boolean>(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  const triggerToast = (msg: string) => {
+    setToastMessage(msg);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3200);
+  };
+
+  // Sync audio element when track changes
   useEffect(() => {
     const audio = new Audio();
-    // GitHub Pages base url fallback: if pathname has prefix
+    // GitHub Pages base url fallback: if pathname has prefix /wanai
     const basePath = window.location.pathname.startsWith('/wanai') ? '/wanai' : '';
-    const audioUrl = src.startsWith('http') ? src : `${basePath}${src.startsWith('/') ? '' : '/'}${src}`;
-    
+    const audioUrl = currentTrack.src.startsWith('http')
+      ? currentTrack.src
+      : `${basePath}${currentTrack.src.startsWith('/') ? '' : '/'}${currentTrack.src}`;
+
     audio.src = audioUrl;
     audio.loop = true;
     audio.preload = 'auto';
     audioRef.current = audio;
-
-    const handleCanPlay = () => {
-      setIsAudioLoaded(true);
-    };
-
-    audio.addEventListener('canplay', handleCanPlay);
 
     // Attempt autoplay immediately
     const attemptAutoplay = async () => {
       try {
         await audio.play();
         setIsPlaying(true);
-      } catch (err) {
+      } catch {
         // Autoplay policy prevented playback until user interaction
         setIsPlaying(false);
-        // Add one-time user interaction listener to resume automatically
         const handleFirstInteraction = () => {
           if (!hasUserToggled && audioRef.current && audioRef.current.paused) {
             audioRef.current
               .play()
               .then(() => {
                 setIsPlaying(true);
-                setShowToast(true);
-                setTimeout(() => setShowToast(false), 3000);
+                triggerToast(`正在播放: ${currentTrack.artist} - 《${currentTrack.title}》`);
               })
               .catch(() => {});
           }
@@ -70,10 +107,9 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
 
     return () => {
       audio.pause();
-      audio.removeEventListener('canplay', handleCanPlay);
       audioRef.current = null;
     };
-  }, [src]);
+  }, [currentTrack.src]);
 
   const togglePlay = () => {
     setHasUserToggled(true);
@@ -87,6 +123,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
         .play()
         .then(() => {
           setIsPlaying(true);
+          triggerToast(`继续播放: ${currentTrack.artist} - 《${currentTrack.title}》`);
         })
         .catch((err) => {
           console.warn('Playback error:', err);
@@ -94,9 +131,69 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
     }
   };
 
+  const switchTrack = (target: TrackInfo) => {
+    if (target.id === currentTrack.id) return;
+    setHasUserToggled(true);
+    setCurrentTrack(target);
+
+    // Update browser URL query param without reload
+    try {
+      const url = new URL(window.location.href);
+      if (target.id === 'v2') {
+        url.searchParams.set('v', '2');
+      } else {
+        url.searchParams.delete('v');
+      }
+      window.history.replaceState({}, '', url.toString());
+    } catch {
+      // ignore
+    }
+
+    triggerToast(`已切换为${target.label}: ${target.artist} - 《${target.title}》`);
+  };
+
+  const copyCurrentVersionLink = () => {
+    try {
+      const url = new URL(window.location.href);
+      if (currentTrack.id === 'v2') {
+        url.searchParams.set('v', '2');
+      } else {
+        url.searchParams.delete('v');
+      }
+      navigator.clipboard.writeText(url.toString()).then(() => {
+        setCopiedLink(true);
+        triggerToast(`已复制${currentTrack.label}专属链接！`);
+        setTimeout(() => setCopiedLink(false), 2000);
+      });
+    } catch {
+      // fallback
+    }
+  };
+
   return (
-    <>
-      {/* Floating or Header-level Audio Toggle Button */}
+    <div className="flex items-center gap-1.5">
+      {/* Version Selector Pills: V1 / V2 */}
+      <div className="flex items-center bg-neutral-200/80 dark:bg-neutral-800/80 p-0.5 rounded-full border border-neutral-300/70 dark:border-neutral-700/70 text-[10px] font-mono">
+        {TRACKS.map((t) => {
+          const isActive = t.id === currentTrack.id;
+          return (
+            <button
+              key={t.id}
+              onClick={() => switchTrack(t)}
+              className={`px-2 py-0.5 rounded-full transition-all cursor-pointer font-medium ${
+                isActive
+                  ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-950 shadow-xs'
+                  : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'
+              }`}
+              title={`切换至${t.label}（${t.title}）`}
+            >
+              {t.id.toUpperCase()}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Audio Play/Pause Button */}
       <button
         onClick={togglePlay}
         className={`group relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-xs font-mono transition-all duration-300 cursor-pointer shadow-xs ${
@@ -111,7 +208,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
           <>
             <Volume2 className="w-3.5 h-3.5 animate-pulse text-amber-500 dark:text-amber-400" />
             <span className="max-w-[70px] sm:max-w-[100px] truncate text-[11px] font-sans">
-              {songTitle}
+              {currentTrack.title}
             </span>
             {/* Visualizer bars */}
             <span className="flex items-center gap-0.5 h-3 ml-0.5">
@@ -130,13 +227,13 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
         )}
       </button>
 
-      {/* Floating prompt toast when music starts on interaction if browser muted it */}
+      {/* Floating prompt toast */}
       {showToast && (
-        <div className="fixed bottom-6 right-6 z-50 bg-neutral-900/90 dark:bg-white/90 backdrop-blur-md text-white dark:text-neutral-950 px-3.5 py-2 rounded-lg text-xs shadow-lg flex items-center gap-2 animate-fade-in pointer-events-none">
+        <div className="fixed bottom-6 right-6 z-50 bg-neutral-900/95 dark:bg-white/95 backdrop-blur-md text-white dark:text-neutral-950 px-3.5 py-2 rounded-lg text-xs shadow-xl flex items-center gap-2 animate-fade-in pointer-events-none border border-neutral-800 dark:border-neutral-200">
           <Music className="w-3.5 h-3.5 text-amber-400 dark:text-amber-600 animate-spin" />
-          <span>正在播放: {artist} - 《{songTitle}》</span>
+          <span>{toastMessage}</span>
         </div>
       )}
-    </>
+    </div>
   );
 };
